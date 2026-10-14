@@ -1,0 +1,16 @@
+{
+  "name": "timebox",
+  "version": "1.0.0",
+  "description": "Run timed agendas and show the live activity on a big screen.",
+  "main": "server.js",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "pg": "8.13.1"
+  }
+}

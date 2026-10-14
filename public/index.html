@@ -1,0 +1,877 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131a">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Crect x='2' y='5' width='6' height='14' rx='1.5' fill='%23d4471b'/%3E%3Crect x='9' y='5' width='6' height='14' rx='1.5' fill='%23d4471b' opacity='.6'/%3E%3Crect x='16' y='5' width='6' height='14' rx='1.5' fill='%23d4471b' opacity='.3'/%3E%3C/svg%3E">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Timebox</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@500;700;800&family=Atkinson+Hyperlegible:wght@400;700&display=swap">
+<style>
+/* Layout: control room (projects rail + console + run-of-show editor); a separate dark "stage" that takes the hue of the live activity */
+:root{
+  --bg:#eceef3; --surface:#fbfcfe; --sunk:#e3e6ee; --ink:#151a29; --muted:#5a6378; --line:#d3d8e3;
+  --accent:#d4471b; --accent-ink:#ffffff; --ok:#1d8a5f; --warn:#b97a00; --bad:#c62f43;
+  --stage:#0a0c11; --stage-ink:#f3f5fa; --stage-muted:#9aa3b8;
+  --f-display:"Big Shoulders Display","Oswald","Arial Narrow",Impact,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#10131a; --surface:#181c26; --sunk:#0c0f15; --ink:#e9ecf3; --muted:#98a1b5; --line:#2a303e;
+  --accent:#ff6b3f; --accent-ink:#16100d; --ok:#3fcf92; --warn:#f0b43c; --bad:#ff6b7f; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#10131a; --surface:#181c26; --sunk:#0c0f15; --ink:#e9ecf3; --muted:#98a1b5; --line:#2a303e;
+  --accent:#ff6b3f; --accent-ink:#16100d; --ok:#3fcf92; --warn:#f0b43c; --bad:#ff6b7f; color-scheme:dark}
+
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.45}
+*{box-sizing:border-box}
+button,input{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.shell{min-height:100%;display:flex;flex-direction:column;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 32px;max-width:1240px;margin:0 auto;gap:16px}
+.bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.mark{font-family:var(--f-display);font-weight:800;font-size:30px;letter-spacing:.02em;text-transform:uppercase;display:flex;align-items:center;gap:10px;margin:0}
+.mark i{display:inline-grid;grid-template-columns:repeat(3,7px);gap:2px}
+.mark i b{height:18px;border-radius:2px;background:var(--accent)}
+.mark i b:nth-child(2){opacity:.6}.mark i b:nth-child(3){opacity:.3}
+.bar .note{margin-left:auto;font-size:13px;color:var(--muted)}
+.pinform{display:flex;gap:6px}
+.pinform input{width:140px}
+.note.off{color:var(--bad)}
+.chip{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;padding:3px 9px;border-radius:99px;border:1px solid var(--line);color:var(--muted);white-space:nowrap}
+.chip.run{color:var(--ok);border-color:currentColor}
+.chip.pause{color:var(--warn);border-color:currentColor}
+.chip.live{color:var(--accent);border-color:currentColor}
+.chip .dot{width:7px;height:7px;border-radius:50%;background:currentColor}
+.chip.run .dot,.chip.live .dot{animation:pulse 1.6s infinite}
+@keyframes pulse{50%{opacity:.25}}
+
+.banner{display:flex;align-items:center;gap:12px;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px 12px 10px 14px}
+.banner .what{min-width:0;flex:1}
+.banner .what b{font-weight:700}
+.banner .what span{color:var(--muted)}
+
+.layout{display:grid;grid-template-columns:240px minmax(0,1fr);gap:20px;align-items:start}
+@media (max-width:820px){.layout{grid-template-columns:minmax(0,1fr)}}
+
+.rail h2,.sec-h{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 8px}
+.plist{list-style:none;margin:0 0 12px;padding:0;display:flex;flex-direction:column;gap:2px}
+.plist button{width:100%;text-align:left;background:none;border:0;border-radius:8px;padding:8px 10px;display:flex;gap:8px;align-items:center}
+.plist button:hover{background:var(--sunk)}
+.plist button[aria-current="true"]{background:var(--surface);box-shadow:inset 0 0 0 1px var(--line)}
+.plist .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.plist .dur{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.plist .ld{width:7px;height:7px;border-radius:50%;background:var(--accent);flex:none}
+.newp{display:flex;gap:6px}
+.newp input{flex:1;min-width:0}
+@media (max-width:820px){.plist{flex-direction:row;overflow-x:auto;padding-bottom:4px}.plist li{flex:none}.plist button{white-space:nowrap}}
+
+input[type=text],input[type=number]{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:7px 9px}
+input:focus{outline:none;border-color:var(--accent)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:7px;border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-weight:700;white-space:nowrap}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.ghost{background:none;border-color:transparent}
+.btn.ghost:hover{background:var(--sunk)}
+.btn.danger{color:var(--bad)}
+.btn:disabled{opacity:.4;cursor:default}
+.btn svg{width:16px;height:16px;flex:none}
+.ibtn{width:32px;height:32px;padding:0;border-radius:7px;border:0;background:none;display:inline-grid;place-items:center;color:var(--muted)}
+.ibtn:hover{background:var(--sunk);color:var(--ink)}
+.ibtn:disabled{opacity:.3;cursor:default;background:none}
+.ibtn svg{width:16px;height:16px}
+
+.work{display:flex;flex-direction:column;gap:18px;min-width:0}
+.phead{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.pname{font-family:var(--f-display);font-weight:700;font-size:34px;line-height:1.05;text-transform:uppercase;letter-spacing:.01em;border:1px solid transparent !important;background:none !important;padding:2px 6px !important;margin-left:-7px;flex:1;min-width:180px}
+.pname:hover{border-color:var(--line) !important}
+.pname:focus{border-color:var(--accent) !important}
+
+/* console */
+.console{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:grid;gap:16px}
+.readout{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 20px;align-items:end}
+.readout .now{min-width:0}
+.readout .lbl{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.readout .act{font-family:var(--f-display);font-weight:700;font-size:30px;line-height:1.1;text-transform:uppercase;overflow-wrap:anywhere}
+.readout .big{font-family:var(--f-display);font-weight:800;font-size:72px;line-height:.9;font-variant-numeric:tabular-nums;text-align:right}
+.readout .big.last{color:var(--warn)}.readout .big.over{color:var(--bad)}
+.readout .meta{grid-column:1/-1;display:flex;gap:18px;flex-wrap:wrap;font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.readout .meta b{color:var(--ink)}
+@media (max-width:520px){.readout{grid-template-columns:minmax(0,1fr)}.readout .big{text-align:left;font-size:60px}}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.controls .sp{flex:1}
+
+/* timeline scrubber */
+.tl{position:relative;padding-top:4px;user-select:none;-webkit-user-select:none}
+.track{position:relative;height:44px;border-radius:8px;display:flex;overflow:hidden;background:var(--sunk);cursor:pointer;touch-action:none}
+.track.ro{cursor:default}
+.seg{height:100%;position:relative;min-width:2px;border-right:2px solid var(--surface);opacity:.55;transition:opacity .2s}
+.seg:last-child{border-right:0}
+.seg.done{opacity:.9}.seg.cur{opacity:1}
+.seg span{position:absolute;left:8px;top:50%;transform:translateY(-50%);font-size:12px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:calc(100% - 12px);text-shadow:0 1px 2px rgba(0,0,0,.35)}
+.fill{position:absolute;inset:0 auto 0 0;background:rgba(255,255,255,.35);pointer-events:none;mix-blend-mode:soft-light}
+.head{position:absolute;top:-4px;bottom:-4px;width:3px;margin-left:-1.5px;background:var(--ink);border-radius:2px;pointer-events:none}
+.head::before{content:"";position:absolute;top:-4px;left:50%;width:11px;height:11px;margin-left:-5.5px;border-radius:50%;background:var(--ink)}
+.tip{position:absolute;top:-30px;transform:translateX(-50%);background:var(--ink);color:var(--bg);font-size:12px;font-weight:700;padding:2px 7px;border-radius:5px;font-variant-numeric:tabular-nums;pointer-events:none;white-space:nowrap}
+.ticks{position:relative;height:18px;margin-top:5px;font-size:11px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ticks span{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.ticks span:first-child{transform:none}.ticks span:last-child{transform:translateX(-100%)}
+
+/* run of show */
+.ros{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.ros-h{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.ros-h .sec-h{margin:0;flex:1}
+.ros-h .tot{font-size:13px;color:var(--muted);font-variant-numeric:tabular-nums}
+.rows{list-style:none;margin:0;padding:0}
+.row{display:grid;grid-template-columns:52px 26px minmax(0,1fr) 92px auto;gap:8px;align-items:center;padding:7px 10px 7px 14px;border-bottom:1px solid var(--line)}
+.row:last-child{border-bottom:0}
+.row.cur{background:color-mix(in srgb,var(--rc) 12%,transparent)}
+.row .at{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.row.cur .at{color:var(--ink);font-weight:700}
+.sw{width:22px;height:22px;border-radius:6px;border:0;background:var(--rc);padding:0}
+.row input[type=text]{width:100%;min-width:0}
+.mins{display:flex;align-items:center;gap:4px}
+.mins input{width:58px;text-align:right;font-variant-numeric:tabular-nums}
+.mins small{color:var(--muted)}
+.racts{display:flex;gap:0}
+@media (max-width:620px){
+  .row{grid-template-columns:26px minmax(0,1fr) 92px;row-gap:4px}
+  .row .at{grid-column:1/-1;order:-1}
+  .racts{grid-column:1/-1;justify-content:flex-end}
+}
+.addrow{display:flex;gap:8px;padding:10px 14px;border-top:1px solid var(--line);background:var(--sunk);flex-wrap:wrap}
+.addrow input[type=text]{flex:1;min-width:140px}
+.addrow input[type=number]{width:72px}
+.ro-hide{}
+body.ro .ro-hide{display:none !important}
+
+.empty{background:var(--surface);border:1px dashed var(--line);border-radius:14px;padding:40px 24px;text-align:center;color:var(--muted)}
+.empty h2{font-family:var(--f-display);font-size:30px;text-transform:uppercase;color:var(--ink);margin:0 0 6px}
+.toast{position:fixed;left:50%;bottom:calc(18px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:9px 14px;border-radius:8px;font-size:14px;z-index:50;max-width:calc(100% - 32px)}
+
+/* ===== stage (always dark, tinted by the live activity) ===== */
+#stage{position:fixed;inset:0;z-index:40;color:var(--stage-ink);background:var(--stage);--act:#4f7cff;
+  display:grid;grid-template-rows:auto minmax(0,1fr) auto auto;
+  padding:calc(18px + env(safe-area-inset-top,0px)) max(20px,env(safe-area-inset-right,0px)) calc(18px + env(safe-area-inset-bottom,0px)) max(20px,env(safe-area-inset-left,0px));
+  font-family:var(--f-body);overflow:hidden;color-scheme:dark}
+#stage::before{content:"";position:absolute;inset:0;background:radial-gradient(120% 80% at 50% -10%,color-mix(in srgb,var(--act) 55%,transparent),transparent 65%),radial-gradient(80% 50% at 50% 110%,color-mix(in srgb,var(--act) 22%,transparent),transparent 70%);transition:background 1s;pointer-events:none}
+#stage>*{position:relative}
+#stage>.st-cap,#stage>.st-ctl,#stage>.st-prompt{position:absolute}
+.st-top{display:flex;align-items:center;gap:14px;font-size:clamp(14px,1.6vw,22px);color:var(--stage-muted)}
+.st-top .pj{font-family:var(--f-display);font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--stage-ink);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.st-top .wall{margin-left:auto;font-variant-numeric:tabular-nums;font-family:var(--f-display);font-weight:700;font-size:1.3em}
+.st-state{font-size:.7em;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:.2em .7em;border-radius:99px;border:1px solid currentColor;white-space:nowrap}
+.st-main{display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;min-height:0}
+.st-lbl{font-size:clamp(13px,1.5vw,22px);font-weight:700;letter-spacing:.18em;text-transform:uppercase;color:color-mix(in srgb,var(--act) 60%,#fff)}
+.st-act{font-family:var(--f-display);font-weight:700;text-transform:uppercase;font-size:clamp(28px,min(6vw,9vh),110px);line-height:1;margin:.12em 0 0;max-width:100%;overflow-wrap:anywhere;text-wrap:balance}
+.st-time{font-family:var(--f-display);font-weight:800;font-variant-numeric:tabular-nums;font-size:clamp(96px,27vw,30vh);line-height:.86;letter-spacing:-.01em;margin:.06em 0}
+@media (orientation:landscape){.st-time{font-size:min(27vw,36vh)}}
+.st-time.last{color:#ffcf5a}
+.st-time.over{color:#ff6b7f;animation:pulse 1s infinite}
+.st-sub{font-size:clamp(14px,1.6vw,24px);color:var(--stage-muted);font-variant-numeric:tabular-nums}
+.st-next{display:flex;justify-content:space-between;gap:16px;align-items:baseline;font-size:clamp(15px,1.8vw,28px);padding:0 2px 10px;flex-wrap:wrap}
+.st-next .n{color:var(--stage-muted);min-width:0}
+.st-next .n b{color:var(--stage-ink);font-weight:700}
+.st-next .el{font-variant-numeric:tabular-nums;color:var(--stage-muted)}
+.st-next .el b{color:var(--stage-ink)}
+.st-bar{height:clamp(10px,1.4vh,18px);display:flex;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.08);position:relative}
+.st-bar .seg{border-right:2px solid var(--stage);opacity:.35}
+.st-bar .seg.done{opacity:.75}.st-bar .seg.cur{opacity:1}
+.st-bar .pf{position:absolute;inset:0 auto 0 0;background:rgba(255,255,255,.25);pointer-events:none}
+.st-ctl{position:absolute;right:max(20px,env(safe-area-inset-right,0px));bottom:calc(46px + env(safe-area-inset-bottom,0px));display:flex;gap:6px;background:rgba(15,18,26,.82);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:6px;backdrop-filter:blur(8px);transition:opacity .4s}
+#stage.idle .st-ctl{opacity:0;pointer-events:none}
+#stage.idle{cursor:none}
+.st-ctl button{width:44px;height:44px;border:0;border-radius:8px;background:none;color:var(--stage-ink);display:grid;place-items:center}
+.st-ctl button:hover{background:rgba(255,255,255,.1)}
+.st-ctl button[aria-pressed="true"]{color:#ffcf5a}
+.st-ctl svg{width:20px;height:20px}
+.st-ctl .sep{width:1px;background:rgba(255,255,255,.15);margin:6px 2px}
+#stVoice{align-self:center;max-width:190px;height:36px;background:rgba(255,255,255,.08);color:var(--stage-ink);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:0 8px;font-size:13px}
+#stVoice option{background:#181c26;color:#f3f5fa}
+@media (max-width:620px){#stVoice{max-width:110px}}
+.st-cap{position:absolute;left:0;right:0;margin:0 auto;width:fit-content;bottom:calc(104px + env(safe-area-inset-bottom,0px));max-width:min(70%,1100px);text-align:center;font-size:clamp(16px,2.2vw,34px);font-weight:700;padding:.45em 1.1em;border-radius:99px;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);backdrop-filter:blur(6px);transition:opacity .4s}
+.st-cap.off{opacity:0;pointer-events:none}
+.st-prompt{position:absolute;left:max(20px,env(safe-area-inset-left,0px));bottom:calc(46px + env(safe-area-inset-bottom,0px));display:flex;align-items:center;gap:10px;background:rgba(15,18,26,.82);border:1px solid rgba(255,255,255,.18);color:var(--stage-ink);border-radius:12px;padding:10px 14px;font-weight:700;transition:opacity .4s}
+.st-prompt svg{width:20px;height:20px}
+#stage.idle .st-prompt{opacity:0;pointer-events:none}
+@media (prefers-reduced-motion:reduce){*{animation:none !important;transition:none !important}}
+</style>
+
+</head>
+<body>
+<div class="shell" id="shell">
+  <header class="bar">
+    <h1 class="mark"><i aria-hidden="true"><b></b><b></b><b></b></i>Timebox</h1>
+    <span class="note" id="modeNote"></span>
+    <button class="btn" type="button" id="unlockBtn" hidden></button>
+    <form class="pinform" id="pinForm" hidden>
+      <input type="password" id="pinInput" inputmode="numeric" autocomplete="current-password" placeholder="Control PIN" aria-label="Control PIN" maxlength="64">
+      <button class="btn primary" type="submit">Unlock</button>
+    </form>
+  </header>
+
+  <div class="banner" id="liveBanner" hidden>
+    <span class="chip live"><span class="dot"></span>On screen</span>
+    <div class="what"><b id="lbName"></b> <span id="lbAct"></span></div>
+    <button class="btn primary" id="lbWatch" type="button">Watch</button>
+  </div>
+
+  <main class="layout">
+    <aside class="rail">
+      <h2>Projects</h2>
+      <ul class="plist" id="plist"></ul>
+      <form class="newp ro-hide" id="newForm">
+        <input type="text" id="newName" placeholder="New project" aria-label="New project name" maxlength="80">
+        <button class="btn" type="submit">Create</button>
+      </form>
+    </aside>
+    <section class="work" id="work"></section>
+  </main>
+</div>
+
+<div id="stage" hidden>
+  <div class="st-top"><span class="pj" id="stProj"></span><span class="st-state" id="stState"></span><span class="wall" id="stWall"></span></div>
+  <div class="st-main">
+    <div class="st-lbl" id="stLbl"></div>
+    <div class="st-act" id="stAct"></div>
+    <div class="st-time" id="stTime">00:00</div>
+    <div class="st-sub" id="stSub"></div>
+  </div>
+  <div class="st-next"><span class="n" id="stNext"></span><span class="el" id="stEl"></span></div>
+  <div class="st-bar" id="stBar"></div>
+  <div class="st-cap off" id="stCap" role="status" aria-live="polite"></div>
+  <button type="button" class="st-prompt" id="stPrompt"></button>
+  <div class="st-ctl" id="stCtl">
+    <button type="button" id="scPrev" class="w" title="Previous activity (←)" aria-label="Previous activity"></button>
+    <button type="button" id="scPlay" class="w" title="Start / pause (space)" aria-label="Start or pause"></button>
+    <button type="button" id="scNext" class="w" title="Next activity (→)" aria-label="Next activity"></button>
+    <span class="sep w"></span>
+    <select id="stVoice" aria-label="Announcement voice" title="Announcement voice"></select>
+    <button type="button" id="scSound" title="Spoken announcements" aria-label="Spoken announcements" aria-pressed="false"></button>
+    <button type="button" id="scFull" title="Full screen (F)" aria-label="Full screen"></button>
+    <button type="button" id="scExit" title="Back to control room (Esc)" aria-label="Back to control room"></button>
+  </div>
+</div>
+
+<script>
+(() => {
+const COLORS = ['#4f7cff','#ff8a3d','#1fae79','#b65ad8','#e2ae12','#ec4a67','#22aec3','#7a8496'];
+const I = {
+  play:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M7 4.5v15l12.5-7.5z"/></svg>',
+  pause:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4.5" width="4.2" height="15" rx="1"/><rect x="13.8" y="4.5" width="4.2" height="15" rx="1"/></svg>',
+  stop:'<svg viewBox="0 0 24 24" fill="currentColor"><rect x="5.5" y="5.5" width="13" height="13" rx="1.5"/></svg>',
+  reset:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.4-5.7"/><path d="M4 4v4.5h4.5"/></svg>',
+  prev:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M18 5v14L8 12z"/><rect x="5" y="5" width="2.6" height="14" rx="1"/></svg>',
+  next:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 5v14l10-7z"/><rect x="16.4" y="5" width="2.6" height="14" rx="1"/></svg>',
+  screen:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"/><path d="M8 20h8M12 16v4"/></svg>',
+  full:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>',
+  bell:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/></svg>',
+  exit:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+  up:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  down:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  del:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12"/></svg>',
+  go:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>',
+};
+
+/* ---------- state ---------- */
+let connected = true, mode = 'local', canWrite = true, pin = '', pinRequired = false, skew = 0;
+const nowMs = () => Date.now() + skew;   // server-aligned clock
+let projects = new Map();         // id -> project body (mutable clone)
+let liveId = null;
+let selId = null, stageOpen = false, stageId = null;
+let scrubMs = null;               // local override while dragging
+let soundOn = false, audioCtx = null, lastStageIdx = null;
+const wq = new Map();             // per-doc write queue
+
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const uid = p => p + nowMs().toString(36) + Math.random().toString(36).slice(2, 7);
+
+function toast(msg){ const t=document.createElement('div'); t.className='toast'; t.textContent=msg; document.body.append(t); setTimeout(()=>t.remove(), 3200); }
+
+/* ---------- time math ---------- */
+const durMs = a => Math.max(0, Number(a.min) || 0) * 60000;
+const totalMs = p => (p.activities||[]).reduce((s,a)=>s+durMs(a), 0);
+function elapsedOf(p, now = nowMs()){
+  if (scrubMs != null && p.id === selId) return scrubMs;
+  return p.status === 'running' ? Math.max(0, now - (p.anchor||now)) : Math.max(0, p.elapsed||0);
+}
+function locate(p, ms){
+  const acts = p.activities||[]; let t = 0;
+  for (let i=0;i<acts.length;i++){ const d=durMs(acts[i]); if (ms < t+d) return {i, start:t, dur:d, into:ms-t, left:t+d-ms}; t+=d; }
+  return {i:-1, start:t, over: ms - t, total:t};
+}
+function fmt(ms, up){
+  let s = Math.max(0, up ? Math.ceil(ms/1000) : Math.floor(ms/1000));
+  const h = Math.floor(s/3600), m = Math.floor(s%3600/60); s = s%60;
+  const p2 = n => String(n).padStart(2,'0');
+  return h ? `${h}:${p2(m)}:${p2(s)}` : `${p2(m)}:${p2(s)}`;
+}
+const fmtMin = ms => { const m = ms/60000; return m >= 60 ? `${Math.floor(m/60)} h ${Math.round(m%60)} min` : `${+m.toFixed(1)} min`; };
+const clock = d => d.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
+
+/* ---------- storage ---------- */
+function sample(){
+  return { id: 'pexample', name: 'Example: Team workshop', status:'idle', elapsed:0, anchor:0, createdAt: nowMs(),
+    activities: [
+      {id:'a1',name:'Welcome and goals',min:5,color:COLORS[0]},
+      {id:'a2',name:'Context talk',min:10,color:COLORS[1]},
+      {id:'a3',name:'Breakout groups',min:20,color:COLORS[2]},
+      {id:'a4',name:'Share-back',min:15,color:COLORS[3]},
+      {id:'a5',name:'Decisions and wrap-up',min:5,color:COLORS[4]},
+    ]};
+}
+function saveLocal(){ try{ localStorage.setItem('timebox.v1', JSON.stringify({projects:[...projects.values()], liveId})); }catch(e){} }
+function loadLocal(){
+  try{ const d = JSON.parse(localStorage.getItem('timebox.v1')||'null'); if (d && d.projects){ d.projects.forEach(p=>projects.set(p.id,p)); liveId = d.liveId||null; return; } }catch(e){}
+  const s = sample(); projects.set(s.id, s);
+}
+
+function patch(id, data, delay = 0){
+  const p = projects.get(id); if (!p) return;
+  Object.assign(p, data);
+  if (mode === 'local'){ saveLocal(); renderAll(); return; }
+  let q = wq.get(id); if (!q){ q = {patch:{}, busy:false, timer:null}; wq.set(id,q); }
+  Object.assign(q.patch, data);
+  clearTimeout(q.timer); q.timer = setTimeout(()=>flush(id), delay);
+  renderAll();
+}
+async function flush(id){
+  const q = wq.get(id); if (!q || q.busy || !Object.keys(q.patch).length) return;
+  const body = q.patch; q.patch = {}; q.busy = true;
+  try { await api('PATCH', '/api/projects/' + id, body); }
+  catch(e){ writeErr(e); }
+  q.busy = false;
+  if (Object.keys(q.patch).length) flush(id);
+}
+async function api(method, url, body){
+  const r = await fetch(url, { method, headers: { 'Content-Type': 'application/json', 'X-Timebox-Pin': pin }, body: body ? JSON.stringify(body) : undefined });
+  if (!r.ok){ const e = new Error('http ' + r.status); e.code = r.status === 401 ? 'unauthorized' : r.status === 409 ? 'quota_exceeded' : 'unavailable'; throw e; }
+  return r.status === 204 ? null : r.json();
+}
+function lockControls(msg){
+  pin = ''; try { localStorage.removeItem('timebox.pin'); } catch(e){}
+  canWrite = !pinRequired; applyRO(); if (msg) toast(msg);
+}
+function writeErr(e){
+  if (e && e.code === 'unauthorized'){ lockControls('Controls are locked. Enter the PIN to make changes.'); return; }
+  toast(e && e.code === 'quota_exceeded' ? 'Storage is full. Delete an old project and try again.' : 'Could not save that change. Check your connection and try again.');
+}
+async function createProject(name){
+  const p = { id: uid('p'), name, status:'idle', elapsed:0, anchor:0, createdAt: nowMs(), activities: [] };
+  projects.set(p.id, p); selId = p.id;
+  if (mode === 'local'){ saveLocal(); renderAll(); return; }
+  renderAll();
+  try { await api('POST', '/api/projects', {id: p.id, name: p.name, activities: []}); } catch(e){ projects.delete(p.id); writeErr(e); renderAll(); }
+}
+async function deleteProject(id){
+  projects.delete(id);
+  if (selId === id) selId = [...projects.keys()][0] || null;
+  if (liveId === id) setLive(null);
+  if (mode === 'local'){ saveLocal(); renderAll(); return; }
+  renderAll();
+  try { await api('DELETE', '/api/projects/' + id); } catch(e){ writeErr(e); }
+}
+async function setLive(id){
+  if (liveId === id) return;
+  liveId = id;
+  if (mode === 'local'){ saveLocal(); renderAll(); return; }
+  renderAll();
+  try { await api('PUT', '/api/live', {projectId: id}); } catch(e){ writeErr(e); }
+}
+
+/* ---------- transport ---------- */
+function cmd(id, action, arg){
+  const p = projects.get(id); if (!p || !canWrite) return;
+  const now = nowMs(), el = elapsedOf(p, now);
+  switch(action){
+    case 'start':
+      if (p.status === 'running') return;
+      patch(id, {status:'running', anchor: now - (p.status === 'stopped' ? 0 : el), elapsed:0});
+      setLive(id); break;
+    case 'pause': if (p.status === 'running') patch(id, {status:'paused', elapsed: el}); break;
+    case 'toggle': cmd(id, p.status === 'running' ? 'pause' : 'start'); break;
+    case 'stop': patch(id, {status:'stopped', elapsed: el}); break;
+    case 'reset': patch(id, {status:'idle', elapsed:0, anchor:0}); break;
+    case 'seek': {
+      const ms = Math.max(0, Math.min(arg, totalMs(p)));
+      if (p.status === 'running') patch(id, {anchor: now - ms}, 250);
+      else patch(id, {status:'paused', elapsed: ms}, 250);
+      break; }
+    case 'prev': case 'next': {
+      const loc = locate(p, el), acts = p.activities||[];
+      let starts = [], t = 0; acts.forEach(a=>{ starts.push(t); t+=durMs(a); });
+      if (!acts.length) return;
+      let i = loc.i < 0 ? acts.length : loc.i;
+      if (action === 'next') { if (i+1 < acts.length) cmd(id,'seek',starts[i+1]); else cmd(id,'seek',t); }
+      else { const target = (loc.i >= 0 && loc.into > 3000) ? i : Math.max(0, i-1); cmd(id,'seek',starts[target] ?? 0); }
+      break; }
+  }
+}
+
+/* ---------- control room render ---------- */
+function stateChip(p){
+  const st = p.status || 'idle';
+  const map = {running:['run','Running'], paused:['pause','Paused'], stopped:['','Stopped'], idle:['','Ready']};
+  const [c,l] = map[st] || map.idle;
+  return `<span class="chip ${c}"><span class="dot"></span>${l}</span>`;
+}
+function renderList(){
+  const list = [...projects.values()].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0));
+  $('#plist').innerHTML = list.map(p => `<li><button type="button" data-id="${esc(p.id)}" aria-current="${p.id===selId}">
+    ${p.id===liveId?'<span class="ld" title="On screen"></span>':''}<span class="nm">${esc(p.name||'Untitled')}</span><span class="dur">${fmt(totalMs(p))}</span></button></li>`).join('')
+    || `<li style="color:var(--muted);font-size:13px;padding:4px 2px">No projects yet.</li>`;
+}
+let editorKey = '';
+function renderWork(){
+  const w = $('#work'), p = projects.get(selId);
+  if (!p){
+    w.innerHTML = `<div class="empty"><h2>No project open</h2><p>${canWrite ? 'Create a project on the left, then add the activities you want to time.' : 'There are no projects to show yet.'}</p></div>`;
+    editorKey = ''; return;
+  }
+  // build skeleton once per project
+  if (w.dataset.pid !== p.id){
+    w.dataset.pid = p.id; editorKey = '';
+    w.innerHTML = `
+      <div class="phead">
+        <input class="pname" type="text" id="pname" aria-label="Project name" maxlength="80">
+        <span id="pchip"></span>
+        <button class="btn ghost danger ro-hide" type="button" id="pdel">${I.del}Delete</button>
+      </div>
+      <div class="console">
+        <div class="readout">
+          <div class="now"><div class="lbl" id="rLbl"></div><div class="act" id="rAct"></div></div>
+          <div class="big" id="rBig">00:00</div>
+          <div class="meta" id="rMeta"></div>
+        </div>
+        <div class="tl" id="tl"><div class="track" id="track" role="slider" tabindex="0" aria-label="Position in timer"></div><div class="ticks" id="ticks"></div></div>
+        <div class="controls">
+          <span class="ro-hide" style="display:contents">
+            <button class="btn primary" type="button" id="cPlay"></button>
+            <button class="btn" type="button" id="cStop">${I.stop}Stop</button>
+            <button class="btn" type="button" id="cReset">${I.reset}Reset</button>
+            <button class="ibtn" type="button" id="cPrev" title="Previous activity" aria-label="Previous activity">${I.prev}</button>
+            <button class="ibtn" type="button" id="cNext" title="Next activity" aria-label="Next activity">${I.next}</button>
+          </span>
+          <span class="sp"></span>
+          <button class="btn" type="button" id="cStage">${I.screen}Show on big screen</button>
+        </div>
+      </div>
+      <div class="ros">
+        <div class="ros-h"><h3 class="sec-h">Activities</h3><span class="tot" id="rTot"></span></div>
+        <ol class="rows" id="rows"></ol>
+        <form class="addrow ro-hide" id="addForm">
+          <input type="text" id="addName" placeholder="Activity name" aria-label="Activity name" maxlength="80">
+          <input type="number" id="addMin" value="10" min="0.5" step="0.5" aria-label="Minutes">
+          <button class="btn" type="submit">Add activity</button>
+        </form>
+      </div>`;
+    bindWork();
+  }
+  const nm = $('#pname'); if (document.activeElement !== nm) nm.value = p.name || '';
+  nm.readOnly = !canWrite;
+  $('#pchip').innerHTML = stateChip(p) + (p.id===liveId ? ' <span class="chip live"><span class="dot"></span>On screen</span>' : '');
+  $('#cPlay').innerHTML = p.status === 'running' ? `${I.pause}Pause` : `${I.play}${p.status==='paused'?'Resume':'Start'}`;
+  $('#rTot').textContent = `${(p.activities||[]).length} activities · ${fmtMin(totalMs(p))}`;
+  renderTrack(p);
+  renderRows(p);
+}
+function renderTrack(p){
+  const tot = totalMs(p) || 1, acts = p.activities||[];
+  const tr = $('#track');
+  tr.classList.toggle('ro', !canWrite);
+  tr.innerHTML = acts.map((a,i)=>`<div class="seg" data-i="${i}" style="flex:${durMs(a)||0.0001} 1 0;background:${esc(a.color)}"><span>${esc(a.name)}</span></div>`).join('')
+    + `<div class="fill" id="tFill"></div><div class="head" id="tHead"></div>`;
+  let t = 0; const ticks = [`<span style="left:0">00:00</span>`];
+  acts.forEach((a,i)=>{ t += durMs(a); if (i < acts.length-1 && durMs(a)/tot > .06) ticks.push(`<span style="left:${t/tot*100}%">${fmt(t)}</span>`); });
+  if (acts.length) ticks.push(`<span style="left:100%">${fmt(t)}</span>`);
+  $('#ticks').innerHTML = ticks.join('');
+}
+function renderRows(p){
+  const acts = p.activities||[], rows = $('#rows');
+  const key = p.id + '|' + acts.map(a=>a.id+a.color).join(',') + '|' + canWrite;
+  const typing = rows.contains(document.activeElement) && document.activeElement.tagName === 'INPUT';
+  if (key !== editorKey && !typing){
+    editorKey = key;
+    rows.innerHTML = acts.map((a,i)=>`<li class="row" data-i="${i}" style="--rc:${esc(a.color)}">
+      <span class="at"></span>
+      <button type="button" class="sw" data-act="color" title="Change colour" aria-label="Change colour" ${canWrite?'':'disabled'}></button>
+      <input type="text" data-f="name" value="${esc(a.name)}" aria-label="Activity name" maxlength="80" ${canWrite?'':'readonly'}>
+      <span class="mins"><input type="number" data-f="min" value="${esc(a.min)}" min="0.5" step="0.5" aria-label="Minutes" ${canWrite?'':'readonly'}><small>min</small></span>
+      <span class="racts">
+        <button type="button" class="ibtn ro-hide" data-act="go" title="Jump here" aria-label="Jump to this activity">${I.go}</button>
+        <button type="button" class="ibtn ro-hide" data-act="up" title="Move up" aria-label="Move up" ${i===0?'disabled':''}>${I.up}</button>
+        <button type="button" class="ibtn ro-hide" data-act="down" title="Move down" aria-label="Move down" ${i===acts.length-1?'disabled':''}>${I.down}</button>
+        <button type="button" class="ibtn ro-hide" data-act="del" title="Remove" aria-label="Remove activity">${I.del}</button>
+      </span></li>`).join('')
+      || `<li class="row" style="display:block;color:var(--muted)">${canWrite?'Add your first activity below. Each one gets its own block of time.':'No activities yet.'}</li>`;
+  } else {
+    rows.querySelectorAll('.row[data-i]').forEach(r=>{ const a = acts[+r.dataset.i]; if (!a) return;
+      r.querySelectorAll('input').forEach(inp=>{ if (inp !== document.activeElement) inp.value = a[inp.dataset.f]; }); });
+  }
+  let t = 0;
+  rows.querySelectorAll('.row[data-i]').forEach((r,i)=>{ const at = r.querySelector('.at'); if (at) at.textContent = fmt(t); t += durMs(acts[i]||{}); });
+}
+
+function bindWork(){
+  const w = $('#work');
+  $('#pname').addEventListener('input', e => patch(selId, {name: e.target.value.trim() || 'Untitled'}, 600));
+  $('#pdel').addEventListener('click', e => {
+    const b = e.currentTarget;
+    if (b.dataset.armed){ deleteProject(selId); return; }
+    b.dataset.armed = '1'; b.innerHTML = `${I.del}Click again to delete`;
+    setTimeout(()=>{ if (b.isConnected){ delete b.dataset.armed; b.innerHTML = `${I.del}Delete`; } }, 3000);
+  });
+  $('#cPlay').addEventListener('click', ()=>cmd(selId,'toggle'));
+  $('#cStop').addEventListener('click', ()=>cmd(selId,'stop'));
+  $('#cReset').addEventListener('click', ()=>cmd(selId,'reset'));
+  $('#cPrev').addEventListener('click', ()=>cmd(selId,'prev'));
+  $('#cNext').addEventListener('click', ()=>cmd(selId,'next'));
+  $('#cStage').addEventListener('click', ()=>{ if (canWrite) setLive(selId); openStage(selId); });
+  $('#addForm').addEventListener('submit', e => {
+    e.preventDefault(); const p = projects.get(selId); if (!p) return;
+    const name = $('#addName').value.trim() || `Activity ${(p.activities||[]).length+1}`;
+    const min = Math.max(0.5, Number($('#addMin').value) || 10);
+    const acts = (p.activities||[]).map(a=>({...a}));
+    acts.push({id: uid('a'), name, min, color: COLORS[acts.length % COLORS.length]});
+    patch(selId, {activities: acts});
+    $('#addName').value = ''; $('#addName').focus();
+  });
+  const rows = $('#rows');
+  rows.addEventListener('input', e => {
+    const inp = e.target, r = inp.closest('.row'); if (!r || !inp.dataset.f) return;
+    const p = projects.get(selId), acts = p.activities.map(a=>({...a})), i = +r.dataset.i;
+    if (inp.dataset.f === 'name') acts[i].name = inp.value;
+    else { const v = Number(inp.value); if (!(v > 0)) return; acts[i].min = Math.round(v*10)/10; }
+    patch(selId, {activities: acts}, 600);
+  });
+  rows.addEventListener('click', e => {
+    const b = e.target.closest('[data-act]'); if (!b) return;
+    const i = +b.closest('.row').dataset.i, p = projects.get(selId);
+    const acts = p.activities.map(a=>({...a}));
+    switch (b.dataset.act){
+      case 'color': acts[i].color = COLORS[(COLORS.indexOf(acts[i].color)+1) % COLORS.length]; break;
+      case 'up': [acts[i-1], acts[i]] = [acts[i], acts[i-1]]; break;
+      case 'down': [acts[i+1], acts[i]] = [acts[i], acts[i+1]]; break;
+      case 'del': acts.splice(i,1); break;
+      case 'go': { let t=0; for (let k=0;k<i;k++) t+=durMs(acts[k]); cmd(selId,'seek',t); return; }
+    }
+    patch(selId, {activities: acts});
+  });
+  // scrubber
+  const tr = $('#track');
+  const msAt = ev => { const r = tr.getBoundingClientRect(); return Math.max(0, Math.min(1, (ev.clientX - r.left)/r.width)) * totalMs(projects.get(selId)); };
+  tr.addEventListener('pointerdown', ev => {
+    if (!canWrite || !totalMs(projects.get(selId))) return;
+    tr.setPointerCapture(ev.pointerId); scrubMs = msAt(ev); tick();
+  });
+  tr.addEventListener('pointermove', ev => { if (scrubMs == null) return; scrubMs = msAt(ev); tick(); });
+  const end = () => { if (scrubMs == null) return; const v = scrubMs; scrubMs = null; cmd(selId,'seek',v); };
+  tr.addEventListener('pointerup', end); tr.addEventListener('pointercancel', end);
+  tr.addEventListener('keydown', ev => {
+    if (!canWrite) return;
+    const step = ev.shiftKey ? 60000 : 10000, p = projects.get(selId), el = elapsedOf(p);
+    if (ev.key === 'ArrowRight'){ ev.preventDefault(); cmd(selId,'seek',el+step); }
+    else if (ev.key === 'ArrowLeft'){ ev.preventDefault(); cmd(selId,'seek',el-step); }
+    else if (ev.key === 'Home'){ ev.preventDefault(); cmd(selId,'seek',0); }
+  });
+}
+
+/* ---------- live tick (control room + stage) ---------- */
+function readout(p, now){
+  const el = elapsedOf(p, now), tot = totalMs(p), loc = locate(p, el), acts = p.activities||[];
+  const a = loc.i >= 0 ? acts[loc.i] : null;
+  return {el, tot, loc, a, next: loc.i >= 0 ? acts[loc.i+1] : null, acts};
+}
+function tick(){
+  const now = nowMs();
+  const p = projects.get(selId);
+  if (p && $('#rBig')){
+    const r = readout(p, now);
+    $('#rLbl').innerHTML = r.a ? `Now · ${r.loc.i+1} of ${r.acts.length}` : (r.acts.length ? (p.status==='idle' ? 'Ready' : 'Finished') : 'No activities');
+    $('#rAct').textContent = r.a ? r.a.name : (r.acts.length ? (r.loc.over > 0 && p.status==='running' ? 'Time is up' : 'End of plan') : 'Add activities below');
+    const big = $('#rBig');
+    big.textContent = r.a ? fmt(r.loc.left, true) : (r.loc.over > 0 && p.status === 'running' ? '+' + fmt(r.loc.over) : '00:00');
+    big.className = 'big' + (r.a && r.loc.left <= 60000 && r.loc.dur > 60000 ? ' last' : '') + (!r.a && r.loc.over > 0 && p.status==='running' ? ' over' : '');
+    $('#rMeta').innerHTML = `<span>Elapsed <b>${fmt(Math.min(r.el, r.tot))}</b></span><span>Remaining <b>${fmt(Math.max(0, r.tot - r.el), true)}</b></span><span>Total <b>${fmt(r.tot)}</b></span>`
+      + (r.next ? `<span>Next <b>${esc(r.next.name)}</b></span>` : '')
+      + (p.status === 'running' && r.tot > r.el ? `<span>Ends at <b>${clock(new Date(now + r.tot - r.el))}</b></span>` : '');
+    const frac = r.tot ? Math.min(1, r.el / r.tot) : 0;
+    const head = $('#tHead'), fill = $('#tFill');
+    if (head){ head.style.left = (frac*100)+'%'; fill.style.width = (frac*100)+'%'; }
+    $('#track').setAttribute('aria-valuetext', `${fmt(r.el)} of ${fmt(r.tot)}`);
+    document.querySelectorAll('#track .seg').forEach((s,i)=>{ s.classList.toggle('cur', i===r.loc.i); s.classList.toggle('done', r.loc.i < 0 ? r.el>0 : i < r.loc.i); });
+    document.querySelectorAll('#rows .row[data-i]').forEach((row,i)=> row.classList.toggle('cur', i===r.loc.i && (p.status!=='idle' || r.el>0)));
+    let tip = $('#tl .tip');
+    if (scrubMs != null){ if (!tip){ tip = document.createElement('div'); tip.className='tip'; $('#tl').append(tip); } tip.style.left = (frac*100)+'%'; tip.textContent = fmt(scrubMs); }
+    else if (tip) tip.remove();
+  }
+  if (stageOpen) tickStage(now);
+  // live banner
+  const lp = liveId && projects.get(liveId);
+  const lb = $('#liveBanner');
+  if (lp && !stageOpen){
+    lb.hidden = false;
+    const r = readout(lp, now);
+    $('#lbName').textContent = lp.name;
+    $('#lbAct').textContent = r.a ? `· ${r.a.name} · ${fmt(r.loc.left, true)} left` : `· ${({running:'Running',paused:'Paused',stopped:'Stopped',idle:'Ready'})[lp.status]||''}`;
+  } else lb.hidden = true;
+}
+
+/* ---------- stage ---------- */
+let wakeLock = null, idleT = null;
+function openStage(id){
+  stageId = id; stageOpen = true; ann = null;
+  $('#stage').hidden = false; $('#shell').setAttribute('aria-hidden','true');
+  try { navigator.wakeLock?.request('screen').then(l=>wakeLock=l).catch(()=>{}); } catch(e){}
+  renderStageBar(); tickStage(nowMs()); poke();
+}
+function closeStage(){
+  stageOpen = false; $('#stage').hidden = true; $('#shell').removeAttribute('aria-hidden');
+  try { wakeLock?.release(); } catch(e){} wakeLock = null;
+  if (document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
+  tick();
+}
+let stageBarKey = '';
+function renderStageBar(){
+  const p = projects.get(stageId); if (!p) return;
+  const key = (p.activities||[]).map(a=>a.id+a.min+a.color).join(',');
+  if (key === stageBarKey) return; stageBarKey = key;
+  $('#stBar').innerHTML = (p.activities||[]).map(a=>`<div class="seg" style="flex:${durMs(a)||0.0001} 1 0;background:${esc(a.color)}"></div>`).join('') + '<div class="pf" id="stPf"></div>';
+}
+function tickStage(now){
+  const p = projects.get(stageId), st = $('#stage');
+  $('#stWall').textContent = clock(new Date(now));
+  if (!p){ $('#stProj').textContent = ''; $('#stAct').textContent = 'Project not found'; $('#stTime').textContent = '--:--'; return; }
+  renderStageBar();
+  const r = readout(p, now);
+  $('#stProj').textContent = p.name;
+  const stMap = {running:['Live','#3fcf92'], paused:['Paused','#ffcf5a'], stopped:['Stopped','#9aa3b8'], idle:['Ready','#9aa3b8']};
+  const [sl, sc] = stMap[p.status] || stMap.idle; const ss = $('#stState'); ss.textContent = sl; ss.style.color = sc;
+  st.style.setProperty('--act', r.a ? r.a.color : (r.acts.length ? '#7a8496' : '#4f7cff'));
+  const over = !r.a && r.loc.over > 0 && p.status === 'running';
+  $('#stLbl').textContent = r.a ? `Now · ${r.loc.i+1} of ${r.acts.length}` : (over ? 'Overtime' : (r.acts.length ? 'Finished' : ''));
+  $('#stAct').textContent = r.a ? r.a.name : (over ? 'Time is up' : (r.acts.length ? (p.status==='idle' ? p.name : 'All done') : 'No activities yet'));
+  const t = $('#stTime');
+  t.textContent = r.a ? fmt(r.loc.left, true) : (over ? '+' + fmt(r.loc.over) : '00:00');
+  t.className = 'st-time' + (r.a && r.loc.left <= 60000 && r.loc.dur > 60000 && p.status==='running' ? ' last' : '') + (over ? ' over' : '');
+  $('#stSub').textContent = r.a ? (p.status === 'running' ? `remaining · ends ${clock(new Date(now + r.loc.left))}` : `remaining of ${fmtMin(r.loc.dur)}`) : '';
+  $('#stNext').innerHTML = r.next ? `Next <b>${esc(r.next.name)}</b> · ${fmtMin(durMs(r.next))}` : (r.a ? 'Last activity' : '');
+  $('#stEl').innerHTML = `<b>${fmt(Math.min(r.el, r.tot))}</b> / ${fmt(r.tot)}`;
+  const pf = $('#stPf'); if (pf) pf.style.width = (r.tot ? Math.min(1, r.el/r.tot)*100 : 0) + '%';
+  $('#stBar').querySelectorAll('.seg').forEach((s,i)=>{ s.classList.toggle('cur', i===r.loc.i); s.classList.toggle('done', r.loc.i<0 ? r.el>0 : i<r.loc.i); });
+  $('#scPlay').innerHTML = p.status === 'running' ? I.pause : I.play;
+  announceTick(p, r);
+}
+
+/* ---------- announcements ---------- */
+const SOON_MS = 60000, WRAP_MS = 5 * 60000;
+let ann = null, capT = null;
+const speakable = s => String(s||'').replace(/\s*[·•|]\s*/g, ', ').replace(/&/g, ' and ');
+const minsWord = ms => { const m = Math.round(ms/60000*10)/10; return m === 1 ? 'one minute' : `${m} minutes`; };
+function announceTick(p, r){
+  const running = p.status === 'running', el = r.el, tot = r.tot, acts = r.acts;
+  const idx = running ? r.loc.i : null;
+  if (!ann || ann.pid !== p.id){ ann = {pid:p.id, el, idx, running}; return; }
+  const msgs = [];
+  // activity start: on reaching a new activity at (or near) its beginning, including Start and jumps
+  if (running && idx >= 0 && idx !== ann.idx && r.loc.into < 3000)
+    msgs.push(`It's time for: ${speakable(acts[idx].name)}. You have ${minsWord(r.loc.dur)}.`);
+  // timed warnings only when the clock moved forward on its own (not on scrubs or jumps)
+  const prev = ann.el, natural = running && ann.running && el >= prev && el - prev < 2500;
+  if (natural && tot){
+    let t = 0;
+    acts.forEach((a, i) => {
+      const end = t + durMs(a);
+      if (i + 1 < acts.length && durMs(a) > SOON_MS * 2){
+        const th = end - SOON_MS;
+        if (prev < th && el >= th) msgs.push(`One minute left. Next up: ${speakable(acts[i+1].name)}.`);
+      }
+      t = end;
+    });
+    const wth = tot - WRAP_MS;
+    if (tot > WRAP_MS * 2 && prev < wth && el >= wth) msgs.push('Five minutes remaining in the session. Please start wrapping up.');
+    if (prev < tot && el >= tot) msgs.push("That's time. Thank you, everyone. Great work today.");
+  }
+  ann = {pid:p.id, el, idx, running};
+  msgs.forEach(say);
+}
+function say(text){
+  const cap = $('#stCap');
+  cap.textContent = text; cap.classList.remove('off');
+  clearTimeout(capT); capT = setTimeout(()=>cap.classList.add('off'), 7000);
+  if (!soundOn) return;
+  chime(1);
+  try {
+    const synth = window.speechSynthesis; if (!synth) return;
+    const u = new SpeechSynthesisUtterance(text);
+    const v = pickVoice();
+    if (v) u.voice = v;
+    u.lang = v ? v.lang : 'en-GB';
+    u.rate = 1; u.pitch = 1; u.volume = 1;   // natural pace, steady pitch
+    setTimeout(()=>synth.speak(u), 700);
+  } catch(e){}
+}
+// Default: the clearest English female voice on the device. The picker on the stage can choose any installed voice.
+const GB_FEMALE = /serena|kate|libby|sonia|maisie|martha|stephanie|google uk english female|hazel|susan/i;
+const EN_FEMALE = /samantha|ava|allison|jenny|aria|michelle|zira|karen|tessa|moira|fiona|female/i;
+let voicePref = '';
+try { voicePref = localStorage.getItem('timebox.voice') || ''; } catch(e){}
+function allVoices(){ try { return window.speechSynthesis?.getVoices() || []; } catch(e){ return []; } }
+function pickVoice(){
+  const vs = allVoices();
+  const en = vs.filter(v => /^en/i.test(v.lang));
+  const better = list => list.find(v => /natural|premium|enhanced|neural/i.test(v.name)) || list[0];
+  return (voicePref && vs.find(v => v.name === voicePref))
+      || better(en.filter(v => /^en[-_]GB/i.test(v.lang) && GB_FEMALE.test(v.name)))
+      || better(en.filter(v => EN_FEMALE.test(v.name)))
+      || better(en) || null;
+}
+function fillVoices(){
+  const sel = $('#stVoice'); if (!sel) return;
+  const vs = allVoices().filter(v => /^(en|nb|no|nn)/i.test(v.lang))
+    .sort((a,b) => a.lang.localeCompare(b.lang) || a.name.localeCompare(b.name));
+  const cur = pickVoice();
+  sel.innerHTML = vs.length ? vs.map(v => `<option value="${esc(v.name)}" ${cur && v.name===cur.name ? 'selected' : ''}>${esc(v.name)} (${esc(v.lang)})</option>`).join('') : '<option>No voices on this device</option>';
+}
+try { window.speechSynthesis?.addEventListener('voiceschanged', fillVoices); } catch(e){}
+function setSound(on){
+  soundOn = on;
+  $('#scSound').setAttribute('aria-pressed', on);
+  $('#stPrompt').hidden = on;
+  if (on){
+    try { audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)(); audioCtx.resume(); } catch(err){}
+    try { window.speechSynthesis?.getVoices(); } catch(err){}
+    fillVoices();
+    say('Announcements are on.');
+    setTimeout(() => { if (!pickVoice()) toast('This device has no built-in voice, so you will see captions and hear chimes only.'); }, 400);
+  } else { try { window.speechSynthesis?.cancel(); } catch(err){} }
+}
+function chime(n){
+  if (!soundOn || !audioCtx) return;
+  const t0 = audioCtx.currentTime;
+  for (let k=0;k<n;k++){ [880, 1318.5].forEach((f,j)=>{
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+    o.type = 'sine'; o.frequency.value = f; o.connect(g); g.connect(audioCtx.destination);
+    const s = t0 + k*0.5 + j*0.12; g.gain.setValueAtTime(0, s); g.gain.linearRampToValueAtTime(0.25, s+0.02); g.gain.exponentialRampToValueAtTime(0.001, s+0.9);
+    o.start(s); o.stop(s+1); }); }
+}
+function poke(){ const st = $('#stage'); st.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(()=>st.classList.add('idle'), 3000); }
+function bindStage(){
+  $('#scPrev').innerHTML = I.prev; $('#scNext').innerHTML = I.next; $('#scSound').innerHTML = I.bell; $('#scFull').innerHTML = I.full; $('#scExit').innerHTML = I.exit;
+  $('#scPrev').onclick = () => cmd(stageId,'prev');
+  $('#scNext').onclick = () => cmd(stageId,'next');
+  $('#scPlay').onclick = () => cmd(stageId,'toggle');
+  $('#scExit').onclick = closeStage;
+  $('#scFull').onclick = () => { const st = $('#stage');
+    if (document.fullscreenElement) document.exitFullscreen?.().catch(()=>{});
+    else (st.requestFullscreen ? st.requestFullscreen() : Promise.reject()).catch(()=>toast('Full screen is not available here. Use your browser’s full screen mode instead.')); };
+  $('#scSound').onclick = () => setSound(!soundOn);
+  fillVoices();
+  $('#stVoice').onchange = e => {
+    voicePref = e.target.value;
+    try { localStorage.setItem('timebox.voice', voicePref); } catch(err){}
+    if (soundOn){ try { window.speechSynthesis.cancel(); } catch(err){} say('This is how announcements will sound.'); }
+  };
+  $('#stPrompt').innerHTML = `${I.bell}Turn on spoken announcements`;
+  $('#stPrompt').onclick = () => setSound(true);
+  const st = $('#stage');
+  ['pointermove','pointerdown','keydown'].forEach(ev => st.addEventListener(ev, poke));
+  document.addEventListener('keydown', e => {
+    if (!stageOpen) return;
+    if (e.key === 'Escape' && !document.fullscreenElement) closeStage();
+    else if (e.key === ' ' && canWrite){ e.preventDefault(); cmd(stageId,'toggle'); }
+    else if (e.key === 'ArrowRight' && canWrite) cmd(stageId,'next');
+    else if (e.key === 'ArrowLeft' && canWrite) cmd(stageId,'prev');
+    else if (e.key === 'f' || e.key === 'F') $('#scFull').click();
+  });
+}
+
+/* ---------- app wiring ---------- */
+function applyRO(){
+  document.body.classList.toggle('ro', !canWrite);
+  document.querySelectorAll('#stCtl .w').forEach(b => b.hidden = !canWrite);
+  $('#modeNote').textContent = mode === 'local'
+    ? 'Server unreachable · saved in this browser only'
+    : (!connected ? 'Reconnecting…' : canWrite ? 'Controls unlocked · live for everyone with the link' : 'Watching live');
+  $('#modeNote').classList.toggle('off', mode !== 'local' && !connected);
+  const ub = $('#unlockBtn');
+  ub.hidden = !(mode === 'shared' && pinRequired) || !$('#pinForm').hidden;
+  ub.textContent = canWrite ? 'Lock controls' : 'Unlock controls';
+  editorKey = ''; $('#work').dataset.pid = '';
+  renderAll();
+}
+function renderAll(){
+  if (selId && !projects.has(selId)) selId = null;
+  if (!selId) selId = (liveId && projects.has(liveId)) ? liveId : ([...projects.values()].sort((a,b)=>(a.createdAt||0)-(b.createdAt||0))[0]?.id || null);
+  renderList(); renderWork(); tick();
+}
+$('#plist').addEventListener('click', e => { const b = e.target.closest('button[data-id]'); if (!b) return; selId = b.dataset.id; scrubMs = null; renderAll(); });
+$('#newForm').addEventListener('submit', e => { e.preventDefault(); const n = $('#newName').value.trim(); createProject(n || 'Untitled project'); $('#newName').value = ''; });
+$('#lbWatch').addEventListener('click', () => liveId && openStage(liveId));
+bindStage();
+
+let lastSec = -1;
+(function loop(){ const s = Math.floor(nowMs()/250); if (s !== lastSec){ lastSec = s; tick(); } requestAnimationFrame(loop); })();
+
+// start in local mode so the page is useful at once; upgrade to the shared store when it answers
+loadLocal(); applyRO();
+const wantStage = location.hash === '#live' || location.hash === '#stage';
+
+$('#unlockBtn').addEventListener('click', () => {
+  if (canWrite){ lockControls(); return; }
+  $('#pinForm').hidden = false; $('#unlockBtn').hidden = true; $('#pinInput').focus();
+});
+$('#pinForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  pin = $('#pinInput').value.trim();
+  try {
+    await api('POST', '/api/unlock');
+    canWrite = true; try { localStorage.setItem('timebox.pin', pin); } catch(err){}
+    $('#pinForm').hidden = true; $('#pinInput').value = '';
+    if (stageOpen) closeStage();
+    applyRO(); toast('Controls unlocked on this device.');
+  } catch(err){ pin = ''; toast(err.code === 'unauthorized' ? 'That PIN is not right. Try again.' : 'Could not reach the server. Try again.'); }
+});
+function applyState(m){
+  const map = new Map();
+  (m.projects || []).forEach(p => { const body = JSON.parse(JSON.stringify(p)); const q = wq.get(p.id); if (q) Object.assign(body, q.patch); map.set(p.id, body); });
+  projects = map; liveId = m.liveId || null;
+  renderAll();
+  // watchers follow whatever is on the big screen; once per live change, so closing the stage sticks
+  if (!canWrite && liveId && projects.has(liveId) && autoFor !== liveId){ autoFor = liveId; openStage(liveId); }
+}
+let autoFor = null;
+function maybeAutoStage(){
+  if (!stageOpen && liveId && projects.has(liveId) && (wantStage || !canWrite)){ autoFor = liveId; openStage(liveId); }
+}
+(async () => {
+  let st;
+  try { const r = await fetch('/api/state', {cache: 'no-store'}); if (!r.ok) throw 0; st = await r.json(); } catch(e){ applyRO(); return; }
+  mode = 'shared'; pinRequired = !!st.pinRequired; skew = st.now - Date.now();
+  try { pin = localStorage.getItem('timebox.pin') || ''; } catch(e){}
+  canWrite = !pinRequired;
+  if (pinRequired && pin){ try { await api('POST', '/api/unlock'); canWrite = true; } catch(e){ pin = ''; } }
+  projects = new Map(); selId = null;
+  applyState(st); applyRO(); maybeAutoStage();
+  const es = new EventSource('/api/events');
+  es.onopen = () => { if (!connected){ connected = true; applyRO(); } };
+  es.onerror = () => { if (connected){ connected = false; applyRO(); } };
+  es.onmessage = ev => {
+    let m; try { m = JSON.parse(ev.data); } catch(e){ return; }
+    if (typeof m.now === 'number') skew = m.now - Date.now();
+    if (m.type === 'state') applyState(m);
+  };
+})();
+})();
+</script>
+
+</body>
+</html>
